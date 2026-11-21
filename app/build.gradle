@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace 'com.wingman.app'
-    compileSdk 34
+    compileSdk 36
 
     defaultConfig {
         applicationId 'com.wingman.app'
@@ -31,4 +31,9 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    // Google's on-phone AI (Gemini Nano) through ML Kit GenAI Prompt API
+    implementation 'com.google.mlkit:genai-prompt:1.0.0-beta5'
 }

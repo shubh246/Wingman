@@ -19,6 +19,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".NanoActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <service
             android:name=".WingmanService"
             android:exported="true"

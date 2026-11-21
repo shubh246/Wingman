@@ -89,10 +89,19 @@ public class MainActivity extends Activity {
         rGem.setId(2002);
         rGem.setText("Gemini (free) · suggestions right in the bubble, automatically. Free key from Google, with daily limits.");
         rGem.setChecked(engine.equals("gemini"));
+        RadioButton rNano = new RadioButton(this);
+        rNano.setId(2003);
+        rNano.setText("On-phone AI (Gemini Nano) · free, private, nothing leaves your phone. Only on supported phones; tap Test below.");
+        rNano.setChecked(engine.equals("nano"));
+        engineGroup.addView(rNano);
         engineGroup.addView(rGem);
         engineGroup.addView(rApp);
         engineGroup.addView(rApi);
         col.addView(engineGroup);
+
+        Button testNano = button("Test on-phone AI on this phone");
+        testNano.setOnClickListener(v -> startActivity(new Intent(this, NanoActivity.class).putExtra("test", true)));
+        col.addView(testNano);
 
         col.addView(header("Gemini key (only for Gemini mode)"));
         geminiKey = edit("AIza…", p.getString("geminiKey", ""), false);
@@ -182,7 +191,8 @@ public class MainActivity extends Activity {
                 .putString("apiKey", apiKey.getText().toString().trim())
                 .putString("model", model)
                 .putString("engine", engineGroup.getCheckedRadioButtonId() == 2001 ? "api"
-                        : engineGroup.getCheckedRadioButtonId() == 2002 ? "gemini" : "app")
+                        : engineGroup.getCheckedRadioButtonId() == 2002 ? "gemini"
+                        : engineGroup.getCheckedRadioButtonId() == 2003 ? "nano" : "app")
                 .putString("geminiKey", geminiKey.getText().toString().trim())
                 .putString("geminiModel", geminiModel.getText().toString().trim())
                 .putString("aboutMe", aboutMe.getText().toString().trim())

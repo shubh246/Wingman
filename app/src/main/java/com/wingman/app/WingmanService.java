@@ -66,6 +66,7 @@ public class WingmanService extends AccessibilityService {
         Item(String t, Rect r, boolean c) { text = t; this.r = r; clickable = c; }
     }
 
+    private static WingmanService instance;
     private final Handler main = new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private SharedPreferences prefs;
@@ -108,6 +109,7 @@ public class WingmanService extends AccessibilityService {
 
     @Override
     protected void onServiceConnected() {
+        instance = this;
         wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         prefs = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
         buildBubble();
@@ -131,6 +133,7 @@ public class WingmanService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        instance = null;
         main.removeCallbacksAndMessages(null);
         hidePanel();
         hideBubble();
@@ -215,7 +218,8 @@ public class WingmanService extends AccessibilityService {
             updateBubble();
             if (panelShown) renderPanel();
             main.removeCallbacks(autoTask);
-            if (!useApp() && prefs.getBoolean("auto", true)) main.postDelayed(autoTask, 1800);
+            String en = engine();
+            if ((en.equals("api") || en.equals("gemini")) && prefs.getBoolean("auto", true)) main.postDelayed(autoTask, 1800);
         }
     }
 
@@ -270,9 +274,29 @@ public class WingmanService extends AccessibilityService {
     // ------------------------------------------------------------------ suggestions
 
     /** "app" = send to the Claude app (no API key needed); "api" = suggestions right in the bubble. */
-    private boolean useApp() {
+    private String engine() {
         String def = prefs.getString("apiKey", "").isEmpty() ? "app" : "api";
-        return prefs.getString("engine", def).equals("app");
+        return prefs.getString("engine", def);
+    }
+
+    private boolean useApp() { return engine().equals("app"); }
+
+    /** Called by the on-phone AI panel after it closes, so the dating app's box is on screen again. */
+    static void insertLater(String text) {
+        WingmanService s = instance;
+        if (s != null) s.main.postDelayed(() -> s.insert(text), 450);
+    }
+
+    private void openNano() {
+        Intent i = new Intent(this, NanoActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        i.putExtra("mode", mode);
+        i.putExtra("text", currentText());
+        i.putExtra("app", currentPkg);
+        i.putExtra("tone", tone);
+        try { startActivity(i); } catch (Exception e) {
+            Toast.makeText(this, "Couldn't open the on-phone AI panel.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void askClaudeApp() {
@@ -505,6 +529,7 @@ public class WingmanService extends AccessibilityService {
 
     private void togglePanel() {
         if (panelShown) { hidePanel(); return; }
+        if (engine().equals("nano")) { openNano(); return; }
         try { wm.addView(panel, panelLp); panelShown = true; } catch (Exception ignored) { return; }
         renderPanel();
         if (suggestions.isEmpty() && !loading && !useApp()) generate();
@@ -651,7 +676,7 @@ public class WingmanService extends AccessibilityService {
         Toast.makeText(this, "Copied. Paste it in the app.", Toast.LENGTH_SHORT).show();
     }
 
-    private void insert(String text) {
+    void insert(String text) {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         AccessibilityNodeInfo box = null;
         if (root != null) {

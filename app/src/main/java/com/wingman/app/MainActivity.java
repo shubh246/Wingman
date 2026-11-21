@@ -90,6 +90,11 @@ public class MainActivity extends Activity {
         rGem.setId(2002);
         rGem.setText("Gemini (free) · suggestions right in the bubble, automatically. Free key from Google, with daily limits.");
         rGem.setChecked(engine.equals("gemini"));
+        RadioButton rGemApp = new RadioButton(this);
+        rGemApp.setId(2005);
+        rGemApp.setText("Gemini app · free with your Google account. The bubble opens Gemini in split screen with everything filled in; you tap send.");
+        rGemApp.setChecked(engine.equals("geminiapp"));
+        engineGroup.addView(rGemApp);
         RadioButton rFree = new RadioButton(this);
         rFree.setId(2004);
         rFree.setText("Free AI provider (Groq, OpenRouter, Cerebras, Mistral) · suggestions right in the bubble, free key.");
@@ -148,7 +153,7 @@ public class MainActivity extends Activity {
         col.addView(geminiModel);
 
         splitSwitch = new Switch(this);
-        splitSwitch.setText("Claude app mode: open Claude in split screen under the dating app");
+        splitSwitch.setText("Claude / Gemini app mode: open it in split screen under the dating app");
         splitSwitch.setTextSize(15);
         splitSwitch.setChecked(p.getBoolean("split", true));
         col.addView(splitSwitch);
@@ -244,7 +249,8 @@ public class MainActivity extends Activity {
                 .putString("engine", engineGroup.getCheckedRadioButtonId() == 2001 ? "api"
                         : engineGroup.getCheckedRadioButtonId() == 2002 ? "gemini"
                         : engineGroup.getCheckedRadioButtonId() == 2003 ? "nano"
-                        : engineGroup.getCheckedRadioButtonId() == 2004 ? "free" : "app")
+                        : engineGroup.getCheckedRadioButtonId() == 2004 ? "free"
+                        : engineGroup.getCheckedRadioButtonId() == 2005 ? "geminiapp" : "app")
                 .putString("freeProvider", FreeAI.PROVIDERS[Math.max(0, Math.min(FreeAI.PROVIDERS.length - 1,
                         providerGroup.getCheckedRadioButtonId() - 3000))][0])
                 .putString("freeKey", freeKey.getText().toString().trim())

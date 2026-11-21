@@ -352,7 +352,8 @@ public class WingmanService extends AccessibilityService {
         return prefs.getString("engine", def);
     }
 
-    private boolean useApp() { return engine().equals("app"); }
+    private boolean useApp() { return engine().equals("app") || engine().equals("geminiapp"); }
+    private boolean geminiApp() { return engine().equals("geminiapp"); }
 
     /** Called by the on-phone AI panel after it closes, so the dating app's box is on screen again. */
     static void insertLater(String text) {
@@ -393,20 +394,27 @@ public class WingmanService extends AccessibilityService {
             // Put the dating app into split screen first (unless it already is), then open Claude in the other half.
             if (!inSplitScreen()) performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN);
             main.postDelayed(() -> launchClaude(i), 900);
-            Toast.makeText(this, "Tap send in Claude below, then copy a reply into the chat above. Drag the middle bar to close.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Tap send in " + (geminiApp() ? "Gemini" : "Claude") + " below, then copy a reply into the chat above. Drag the middle bar to close.", Toast.LENGTH_LONG).show();
         } else {
             launchClaude(i);
-            Toast.makeText(this, "Send it in Claude, copy a reply, then come back and paste.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Send it in " + (geminiApp() ? "Gemini" : "Claude") + ", copy a reply, then come back and paste.", Toast.LENGTH_LONG).show();
         }
     }
 
     private void launchClaude(Intent i) {
-        try {
-            i.setPackage("com.anthropic.claude");
-            startActivity(i);
-        } catch (ActivityNotFoundException e) {
+        String[] pkgs = geminiApp()
+                ? new String[]{"com.google.android.apps.bard", "com.google.android.googlequicksearchbox"}
+                : new String[]{"com.anthropic.claude"};
+        for (String pkg : pkgs) {
+            try {
+                i.setPackage(pkg);
+                startActivity(i);
+                return;
+            } catch (ActivityNotFoundException ignored) { }
+        }
+        {
             i.setPackage(null);
-            Intent chooser = Intent.createChooser(i, "Send to Claude");
+            Intent chooser = Intent.createChooser(i, geminiApp() ? "Send to Gemini" : "Send to Claude");
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT);
             try { startActivity(chooser); } catch (Exception ignored) { }
         }
@@ -668,7 +676,7 @@ public class WingmanService extends AccessibilityService {
         }
 
         boolean app = useApp();
-        suggestBtn.setText(app ? "💬 Ask Claude" : "✨ Suggest");
+        suggestBtn.setText(app ? (geminiApp() ? "💬 Ask Gemini" : "💬 Ask Claude") : "✨ Suggest");
         listBox.removeAllViews();
         if (showRead) {
             TextView r = new TextView(this);
@@ -682,7 +690,8 @@ public class WingmanService extends AccessibilityService {
         }
         if (app) {
             listBox.addView(note((mode.equals("chat") ? "Chat read. " : "Profile read: " + profileLines.size() + " lines. ")
-                    + "Pick a vibe, then tap 💬 Ask Claude.\n\nWingman sends what it read to your Claude app. "
+                    + "Pick a vibe, then tap 💬 Ask " + (geminiApp() ? "Gemini" : "Claude") + ".\n\nWingman opens "
+                    + (geminiApp() ? "the Gemini app" : "the Claude app") + " with what it read. "
                     + "Tap send there, copy the reply you like, come back here and paste it."));
             return;
         }

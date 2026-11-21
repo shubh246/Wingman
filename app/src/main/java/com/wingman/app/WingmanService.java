@@ -22,6 +22,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -314,16 +315,41 @@ public class WingmanService extends AccessibilityService {
         i.putExtra(Intent.EXTRA_TEXT, prompt);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         hidePanel();
+        boolean split = prefs.getBoolean("split", true);
+        if (split) {
+            i.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT);
+            // Put the dating app into split screen first (unless it already is), then open Claude in the other half.
+            if (!inSplitScreen()) performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN);
+            main.postDelayed(() -> launchClaude(i), 900);
+            Toast.makeText(this, "Tap send in Claude below, then copy a reply into the chat above. Drag the middle bar to close.", Toast.LENGTH_LONG).show();
+        } else {
+            launchClaude(i);
+            Toast.makeText(this, "Send it in Claude, copy a reply, then come back and paste.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void launchClaude(Intent i) {
         try {
             i.setPackage("com.anthropic.claude");
             startActivity(i);
         } catch (ActivityNotFoundException e) {
             i.setPackage(null);
             Intent chooser = Intent.createChooser(i, "Send to Claude");
-            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT);
             try { startActivity(chooser); } catch (Exception ignored) { }
         }
-        Toast.makeText(this, "Send it in Claude, copy a reply, then come back and paste.", Toast.LENGTH_LONG).show();
+    }
+
+    /** True when two app windows are already side by side. */
+    private boolean inSplitScreen() {
+        try {
+            int apps = 0;
+            for (AccessibilityWindowInfo w : getWindows())
+                if (w.getType() == AccessibilityWindowInfo.TYPE_APPLICATION) apps++;
+            return apps >= 2;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void maybeAutoSuggest() {

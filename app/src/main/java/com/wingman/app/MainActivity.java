@@ -37,7 +37,7 @@ public class MainActivity extends Activity {
     private EditText apiKey, aboutMe, language, geminiKey, geminiModel;
     private RadioGroup modelGroup, engineGroup, providerGroup;
     private EditText freeKey, freeModel;
-    private Switch autoSwitch, allAppsSwitch;
+    private Switch autoSwitch, allAppsSwitch, splitSwitch;
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
@@ -147,6 +147,12 @@ public class MainActivity extends Activity {
         col.addView(text("Gemini model (leave as is unless it shows a model error):", 13, 0xFF888888));
         col.addView(geminiModel);
 
+        splitSwitch = new Switch(this);
+        splitSwitch.setText("Claude app mode: open Claude in split screen under the dating app");
+        splitSwitch.setTextSize(15);
+        splitSwitch.setChecked(p.getBoolean("split", true));
+        col.addView(splitSwitch);
+
         col.addView(header("Claude API key (only for API mode)"));
         apiKey = edit("sk-ant-…", p.getString("apiKey", ""), false);
         apiKey.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
@@ -237,6 +243,7 @@ public class MainActivity extends Activity {
                 .putString("aboutMe", aboutMe.getText().toString().trim())
                 .putString("language", language.getText().toString().trim())
                 .putBoolean("auto", autoSwitch.isChecked())
+                .putBoolean("split", splitSwitch.isChecked())
                 .putBoolean("allApps", allAppsSwitch.isChecked())
                 .apply();
         Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();

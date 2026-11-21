@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
 
     private TextView status;
     private EditText apiKey, aboutMe, language;
-    private RadioGroup modelGroup;
+    private RadioGroup modelGroup, engineGroup;
     private Switch autoSwitch, allAppsSwitch;
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
@@ -74,7 +74,22 @@ public class MainActivity extends Activity {
                 Uri.parse("package:" + getPackageName()))));
         col.addView(info);
 
-        col.addView(header("Claude API key"));
+        col.addView(header("How should Wingman write suggestions?"));
+        engineGroup = new RadioGroup(this);
+        String engine = p.getString("engine", p.getString("apiKey", "").isEmpty() ? "app" : "api");
+        RadioButton rApp = new RadioButton(this);
+        rApp.setId(2000);
+        rApp.setText("Claude app · uses your Claude account, no extra cost. The bubble sends what it read to the Claude app.");
+        rApp.setChecked(engine.equals("app"));
+        RadioButton rApi = new RadioButton(this);
+        rApi.setId(2001);
+        rApi.setText("API key · suggestions appear right in the bubble, automatically. Needs API credit.");
+        rApi.setChecked(engine.equals("api"));
+        engineGroup.addView(rApp);
+        engineGroup.addView(rApi);
+        col.addView(engineGroup);
+
+        col.addView(header("Claude API key (only for API mode)"));
         apiKey = edit("sk-ant-…", p.getString("apiKey", ""), false);
         apiKey.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         col.addView(apiKey);
@@ -102,7 +117,7 @@ public class MainActivity extends Activity {
         col.addView(language);
 
         autoSwitch = new Switch(this);
-        autoSwitch.setText("Auto-suggest when I stop scrolling");
+        autoSwitch.setText("Auto-suggest when I stop scrolling (API mode)");
         autoSwitch.setTextSize(15);
         autoSwitch.setChecked(p.getBoolean("auto", true));
         LinearLayout.LayoutParams sw = new LinearLayout.LayoutParams(-1, -2);
@@ -148,6 +163,7 @@ public class MainActivity extends Activity {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putString("apiKey", apiKey.getText().toString().trim())
                 .putString("model", model)
+                .putString("engine", engineGroup.getCheckedRadioButtonId() == 2001 ? "api" : "app")
                 .putString("aboutMe", aboutMe.getText().toString().trim())
                 .putString("language", language.getText().toString().trim())
                 .putBoolean("auto", autoSwitch.isChecked())

@@ -1,9 +1,11 @@
 package com.wingman.app;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
@@ -94,7 +96,7 @@ public class WingmanService extends AccessibilityService {
     private WindowManager.LayoutParams bubbleLp;
     private LinearLayout panel;
     private WindowManager.LayoutParams panelLp;
-    private TextView panelTitle;
+    private TextView panelTitle, suggestBtn;
     private LinearLayout chipRow, listBox;
     private ScrollView listScroll;
     private boolean panelShown = false, bubbleShown = false;
@@ -213,7 +215,7 @@ public class WingmanService extends AccessibilityService {
             updateBubble();
             if (panelShown) renderPanel();
             main.removeCallbacks(autoTask);
-            if (prefs.getBoolean("auto", true)) main.postDelayed(autoTask, 1800);
+            if (!useApp() && prefs.getBoolean("auto", true)) main.postDelayed(autoTask, 1800);
         }
     }
 
@@ -266,6 +268,39 @@ public class WingmanService extends AccessibilityService {
     }
 
     // ------------------------------------------------------------------ suggestions
+
+    /** "app" = send to the Claude app (no API key needed); "api" = suggestions right in the bubble. */
+    private boolean useApp() {
+        String def = prefs.getString("apiKey", "").isEmpty() ? "app" : "api";
+        return prefs.getString("engine", def).equals("app");
+    }
+
+    private void askClaudeApp() {
+        String text = currentText();
+        if (text.length() < 5) {
+            Toast.makeText(this, "Nothing read yet. Scroll the profile or open a chat first.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String prompt = Claude.appPrompt(prefs.getString("aboutMe", ""), prefs.getString("language", ""),
+                mode, tone, currentPkg, text);
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Wingman", prompt));
+        Intent i = new Intent(Intent.ACTION_SEND);
+        i.setType("text/plain");
+        i.putExtra(Intent.EXTRA_TEXT, prompt);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        hidePanel();
+        try {
+            i.setPackage("com.anthropic.claude");
+            startActivity(i);
+        } catch (ActivityNotFoundException e) {
+            i.setPackage(null);
+            Intent chooser = Intent.createChooser(i, "Send to Claude");
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try { startActivity(chooser); } catch (Exception ignored) { }
+        }
+        Toast.makeText(this, "Send it in Claude, copy a reply, then come back and paste.", Toast.LENGTH_LONG).show();
+    }
 
     private void maybeAutoSuggest() {
         if (loading || currentText().length() < 15) return;
@@ -442,7 +477,8 @@ public class WingmanService extends AccessibilityService {
 
         LinearLayout foot = new LinearLayout(this);
         TextView again = smallButton("✨ Suggest", true);
-        again.setOnClickListener(v -> generate());
+        suggestBtn = again;
+        again.setOnClickListener(v -> { if (useApp()) askClaudeApp(); else generate(); });
         TextView read = smallButton("👀 What it read", false);
         read.setOnClickListener(v -> { showRead = !showRead; renderPanel(); });
         LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, dp(44), 1);
@@ -467,7 +503,7 @@ public class WingmanService extends AccessibilityService {
         if (panelShown) { hidePanel(); return; }
         try { wm.addView(panel, panelLp); panelShown = true; } catch (Exception ignored) { return; }
         renderPanel();
-        if (suggestions.isEmpty() && !loading) generate();
+        if (suggestions.isEmpty() && !loading && !useApp()) generate();
     }
 
     private void hidePanel() {
@@ -496,12 +532,14 @@ public class WingmanService extends AccessibilityService {
             else { g.setColor(0xFFF3F1F3); c.setTextColor(0xFF1D1D1F); }
             c.setBackground(g);
             final String key = t[0];
-            c.setOnClickListener(v -> { tone = key; generate(); });
+            c.setOnClickListener(v -> { tone = key; if (useApp()) renderPanel(); else generate(); });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.setMargins(0, 0, dp(6), 0);
             chipRow.addView(c, lp);
         }
 
+        boolean app = useApp();
+        suggestBtn.setText(app ? "💬 Ask Claude" : "✨ Suggest");
         listBox.removeAllViews();
         if (showRead) {
             TextView r = new TextView(this);
@@ -511,6 +549,12 @@ public class WingmanService extends AccessibilityService {
             r.setTextColor(0xFF555555);
             r.setTextIsSelectable(false);
             listBox.addView(r);
+            return;
+        }
+        if (app) {
+            listBox.addView(note((mode.equals("chat") ? "Chat read. " : "Profile read: " + profileLines.size() + " lines. ")
+                    + "Pick a vibe, then tap 💬 Ask Claude.\n\nWingman sends what it read to your Claude app. "
+                    + "Tap send there, copy the reply you like, come back here and paste it."));
             return;
         }
         if (loading) { listBox.addView(note("Writing suggestions…")); }

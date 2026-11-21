@@ -53,29 +53,14 @@ public final class Claude {
                                            String mode, String tone, String app, String screenText) throws Exception {
         if (apiKey == null || apiKey.trim().isEmpty()) throw new Exception("Open the Wingman app and add your Claude API key.");
 
-        StringBuilder u = new StringBuilder();
-        u.append("App: ").append(app).append('\n');
-        u.append("Vibe: ").append(toneText(tone)).append('\n');
-        if (!aboutMe.isEmpty()) u.append("About me: ").append(aboutMe).append('\n');
-        if (!language.isEmpty()) u.append("Write in: ").append(language).append('\n');
-        if ("chat".equals(mode)) {
-            u.append("\nThis is a chat. Lines start with Me: (the user), Them: (the match) or ?: (unclear, infer it). Oldest first.\n")
-             .append("If the last message is from Me, write a natural follow-up or new thread.\n\n")
-             .append(screenText)
-             .append("\n\nWrite 4 options for my next message.");
-        } else {
-            u.append("\nThis is someone's dating profile, captured as I scrolled:\n\n")
-             .append(screenText)
-             .append("\n\nWrite 4 opening messages for them. Each should react to a different specific detail of the profile ")
-             .append("(like replying to a prompt answer or photo), so it's easy for them to respond.");
-        }
+        String user = buildPrompt(aboutMe, language, mode, tone, app, screenText);
 
         JSONObject body = new JSONObject();
         body.put("model", model);
         body.put("max_tokens", 900);
         body.put("system", SYSTEM);
         JSONArray msgs = new JSONArray();
-        msgs.put(new JSONObject().put("role", "user").put("content", u.toString()));
+        msgs.put(new JSONObject().put("role", "user").put("content", user));
         body.put("messages", msgs);
 
         HttpURLConnection c = (HttpURLConnection) new URL("https://api.anthropic.com/v1/messages").openConnection();
@@ -114,6 +99,34 @@ public final class Claude {
             if (o != null && !o.optString("text").isEmpty()) out.add(new Suggestion(o.optString("text"), o.optString("why")));
         }
         return out;
+    }
+
+    static String buildPrompt(String aboutMe, String language, String mode, String tone, String app, String screenText) {
+        StringBuilder u = new StringBuilder();
+        u.append("App: ").append(app).append('\n');
+        u.append("Vibe: ").append(toneText(tone)).append('\n');
+        if (!aboutMe.isEmpty()) u.append("About me: ").append(aboutMe).append('\n');
+        if (!language.isEmpty()) u.append("Write in: ").append(language).append('\n');
+        if ("chat".equals(mode)) {
+            u.append("\nThis is a chat. Lines start with Me: (the user), Them: (the match) or ?: (unclear, infer it). Oldest first.\n")
+             .append("If the last message is from Me, write a natural follow-up or new thread.\n\n")
+             .append(screenText)
+             .append("\n\nWrite 4 options for my next message.");
+        } else {
+            u.append("\nThis is someone's dating profile, captured as I scrolled:\n\n")
+             .append(screenText)
+             .append("\n\nWrite 4 opening messages for them. Each should react to a different specific detail of the profile ")
+             .append("(like replying to a prompt answer or photo), so it's easy for them to respond.");
+        }
+        return u.toString();
+    }
+
+    /** Prompt to paste into the Claude app: same rules, plain-text answer that's easy to copy. */
+    static String appPrompt(String aboutMe, String language, String mode, String tone, String app, String screenText) {
+        String rules = SYSTEM.substring(0, SYSTEM.indexOf("Output ONLY"));
+        return rules
+            + "Answer with just the 4 messages, numbered 1-4, each on its own line, no quotes and no extra commentary.\n\n"
+            + buildPrompt(aboutMe, language, mode, tone, app, screenText);
     }
 
     private static String readAll(InputStream is) throws Exception {

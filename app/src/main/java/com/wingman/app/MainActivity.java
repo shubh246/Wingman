@@ -196,6 +196,17 @@ public class MainActivity extends Activity {
         col.addView(allAppsSwitch, sw);
         col.addView(text("Off = only Tinder, Bumble, Hinge, OkCupid, Aisle, TrulyMadly, Happn and Badoo.", 13, 0xFF888888));
 
+        Button forget = button("Reset what Wingman learned about each app");
+        forget.setOnClickListener(v -> {
+            SharedPreferences.Editor ed = getSharedPreferences(PREFS, MODE_PRIVATE).edit();
+            for (String k : getSharedPreferences(PREFS, MODE_PRIVATE).getAll().keySet())
+                if (k.startsWith("seen:") || k.startsWith("lines:")) ed.remove(k);
+            ed.apply();
+            Toast.makeText(this, "Reset. Turn Wingman off and on to apply.", Toast.LENGTH_SHORT).show();
+        });
+        col.addView(text("Wingman learns which text is part of each app (buttons, headings, ads) as you browse, and skips it.", 13, 0xFF888888));
+        col.addView(forget);
+
         Button save = button("Save");
         save.setOnClickListener(v -> save());
         col.addView(save);

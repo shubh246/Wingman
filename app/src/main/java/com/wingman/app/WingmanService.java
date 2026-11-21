@@ -63,9 +63,22 @@ public class WingmanService extends AccessibilityService {
             Pattern.CASE_INSENSITIVE);
 
     private static final class Item {
-        final String text; final Rect r; final boolean clickable;
-        Item(String t, Rect r, boolean c) { text = t; this.r = r; clickable = c; }
+        final String text; final Rect r; final boolean clickable; final boolean important;
+        Item(String t, Rect r, boolean c, boolean imp) { text = t; this.r = r; clickable = c; important = imp; }
     }
+
+    // View ids that are app chrome (tabs, toolbars, buttons…) vs. profile/chat content.
+    private static final Pattern CHROME_ID = Pattern.compile(
+            "(^|[_/.:])(tab|tabs|nav|navigation|toolbar|bottom_?bar|app_?bar|action_?bar|menu|badge|counter|count|button|btn|fab|"
+          + "icon|timestamp|time|status|banner|ad|ads|promo|upsell|boost|premium|gold|plus|paywall|tooltip|snackbar|header_title)([_/.:]|$)");
+    private static final Pattern CONTENT_ID = Pattern.compile(
+            "(bio|prompt|answer|about|message|msg|body|bubble|name|age|job|work|title|school|education|interest|passion|"
+          + "hobby|location|hometown|city|caption|description|desc|text_content|content|question|vital|lifestyle|basics|height|looking)");
+
+    // Learned per app: short lines that show up on most profiles = part of the app, not the person.
+    private final java.util.Map<String, Integer> lineCounts = new java.util.HashMap<>();
+    private int profilesSeen = 0;
+    private String learnedPkg = "";
 
     private static WingmanService instance;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -169,6 +182,7 @@ public class WingmanService extends AccessibilityService {
         if (!pkg.equals(currentPkg)) {
             currentPkg = pkg;
             resetContent();
+            loadLearned(pkg);
         }
         showBubble();
 
@@ -191,6 +205,7 @@ public class WingmanService extends AccessibilityService {
             StringBuilder sb = new StringBuilder();
             String prev = null;
             for (String[] s : sided) {
+                if (s[0].equals("?") && isLearnedChrome(s[1])) continue;
                 String label = s[0].equals("me") ? "Me" : s[0].equals("them") ? "Them" : "?";
                 if (label.equals(prev)) sb.append(" / ").append(s[1]);
                 else { if (sb.length() > 0) sb.append('\n'); sb.append(label).append(": ").append(s[1]); }
@@ -200,12 +215,21 @@ public class WingmanService extends AccessibilityService {
             if (chatText.length() > 5000) chatText = chatText.substring(chatText.length() - 5000);
         } else {
             mode = "profile";
+            int h = getResources().getDisplayMetrics().heightPixels;
             List<String> cur = new ArrayList<>();
-            for (Item it : items) if (!(it.clickable && it.text.length() < 14)) cur.add(it.text);
+            for (Item it : items) {
+                if (!it.important) {
+                    if (it.clickable && it.text.length() < 14) continue;          // buttons
+                    if (it.r.bottom < h * 0.08 || it.r.top > h * 0.90) continue;  // top bar / bottom tabs
+                }
+                if (isLearnedChrome(it.text)) continue;
+                cur.add(it.text);
+            }
             int overlap = 0;
             for (String s : cur) if (lastScreen.contains(s)) overlap++;
             // Mostly new text on screen = you moved to a different profile.
             if (!lastScreen.isEmpty() && cur.size() >= 3 && overlap < cur.size() * 0.3) {
+                learnFromProfile();
                 profileLines.clear();
                 profileId++;
             }
@@ -231,10 +255,14 @@ public class WingmanService extends AccessibilityService {
         if (cs == null || cs.toString().trim().isEmpty()) cs = n.getContentDescription();
         if (cs != null) {
             String t = cs.toString().replaceAll("\\s+", " ").trim();
-            if (t.length() >= 2 && !NOISE.matcher(t).matches() && !UI_WORDS.contains(t.toLowerCase()) && seen.add(t)) {
+            String id = n.getViewIdResourceName() == null ? "" : n.getViewIdResourceName().toLowerCase();
+            String idName = id.contains("/") ? id.substring(id.lastIndexOf('/') + 1) : id;
+            boolean content = !idName.isEmpty() && CONTENT_ID.matcher(idName).find();
+            boolean chromeId = !content && !idName.isEmpty() && CHROME_ID.matcher(idName).find();
+            if (!chromeId && t.length() >= 2 && !NOISE.matcher(t).matches() && !UI_WORDS.contains(t.toLowerCase()) && seen.add(t)) {
                 Rect r = new Rect();
                 n.getBoundsInScreen(r);
-                if (r.width() > 0 && r.height() > 0) out.add(new Item(t, r, n.isClickable()));
+                if (r.width() > 0 && r.height() > 0) out.add(new Item(t, r, n.isClickable(), content));
             }
         }
         for (int i = 0; i < n.getChildCount(); i++) collect(n.getChild(i), out, hasInput, depth + 1, seen);
@@ -246,6 +274,50 @@ public class WingmanService extends AccessibilityService {
         if (rightGap < w * 0.12 && leftGap > w * 0.25) return "me";
         if (leftGap < w * 0.2 && rightGap > w * 0.25) return "them";
         return "?";
+    }
+
+    // ------------------------------------------------------------------ learning each app
+
+    private boolean isLearnedChrome(String line) {
+        if (line.length() > 60 || profilesSeen < 4) return false;
+        Integer c = lineCounts.get(line);
+        return c != null && c >= 4 && c >= profilesSeen * 0.6;
+    }
+
+    /** Called when you move to the next profile: count which short lines repeat across profiles. */
+    private void learnFromProfile() {
+        if (profileLines.size() < 3) return;
+        profilesSeen++;
+        for (String l : profileLines) if (l.length() <= 60) {
+            Integer c = lineCounts.get(l);
+            lineCounts.put(l, c == null ? 1 : c + 1);
+        }
+        // keep memory small: forget lines seen only once after a while
+        if (lineCounts.size() > 400) {
+            java.util.Iterator<java.util.Map.Entry<String, Integer>> it = lineCounts.entrySet().iterator();
+            while (it.hasNext()) if (it.next().getValue() <= 1) it.remove();
+        }
+        saveLearned();
+    }
+
+    private void loadLearned(String pkg) {
+        learnedPkg = pkg;
+        lineCounts.clear();
+        profilesSeen = prefs.getInt("seen:" + pkg, 0);
+        String raw = prefs.getString("lines:" + pkg, "");
+        for (String row : raw.split("\n")) {
+            int tab = row.lastIndexOf('\t');
+            if (tab <= 0) continue;
+            try { lineCounts.put(row.substring(0, tab), Integer.parseInt(row.substring(tab + 1))); } catch (Exception ignored) { }
+        }
+    }
+
+    private void saveLearned() {
+        if (learnedPkg.isEmpty()) return;
+        StringBuilder sb = new StringBuilder();
+        for (java.util.Map.Entry<String, Integer> e : lineCounts.entrySet())
+            if (e.getValue() >= 2) sb.append(e.getKey().replace('\n', ' ').replace('\t', ' ')).append('\t').append(e.getValue()).append('\n');
+        prefs.edit().putInt("seen:" + learnedPkg, profilesSeen).putString("lines:" + learnedPkg, sb.toString()).apply();
     }
 
     private void resetContent() {

@@ -34,7 +34,7 @@ public class MainActivity extends Activity {
     };
 
     private TextView status;
-    private EditText apiKey, aboutMe, language;
+    private EditText apiKey, aboutMe, language, geminiKey, geminiModel;
     private RadioGroup modelGroup, engineGroup;
     private Switch autoSwitch, allAppsSwitch;
 
@@ -85,9 +85,27 @@ public class MainActivity extends Activity {
         rApi.setId(2001);
         rApi.setText("API key · suggestions appear right in the bubble, automatically. Needs API credit.");
         rApi.setChecked(engine.equals("api"));
+        RadioButton rGem = new RadioButton(this);
+        rGem.setId(2002);
+        rGem.setText("Gemini (free) · suggestions right in the bubble, automatically. Free key from Google, with daily limits.");
+        rGem.setChecked(engine.equals("gemini"));
+        engineGroup.addView(rGem);
         engineGroup.addView(rApp);
         engineGroup.addView(rApi);
         col.addView(engineGroup);
+
+        col.addView(header("Gemini key (only for Gemini mode)"));
+        geminiKey = edit("AIza…", p.getString("geminiKey", ""), false);
+        geminiKey.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        col.addView(geminiKey);
+        col.addView(text("Free: open aistudio.google.com on your phone → sign in with Google → Get API key → Create API key → copy it here. "
+                + "On the free tier Google may use what's sent to improve its products.", 13, 0xFF888888));
+        Button getKey = button("Open Google AI Studio");
+        getKey.setOnClickListener(v -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/apikey"))));
+        col.addView(getKey);
+        geminiModel = edit(Gemini.DEFAULT_MODEL, p.getString("geminiModel", Gemini.DEFAULT_MODEL), false);
+        col.addView(text("Gemini model (leave as is unless it shows a model error):", 13, 0xFF888888));
+        col.addView(geminiModel);
 
         col.addView(header("Claude API key (only for API mode)"));
         apiKey = edit("sk-ant-…", p.getString("apiKey", ""), false);
@@ -117,7 +135,7 @@ public class MainActivity extends Activity {
         col.addView(language);
 
         autoSwitch = new Switch(this);
-        autoSwitch.setText("Auto-suggest when I stop scrolling (API mode)");
+        autoSwitch.setText("Auto-suggest when I stop scrolling (Gemini / API mode)");
         autoSwitch.setTextSize(15);
         autoSwitch.setChecked(p.getBoolean("auto", true));
         LinearLayout.LayoutParams sw = new LinearLayout.LayoutParams(-1, -2);
@@ -163,7 +181,10 @@ public class MainActivity extends Activity {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putString("apiKey", apiKey.getText().toString().trim())
                 .putString("model", model)
-                .putString("engine", engineGroup.getCheckedRadioButtonId() == 2001 ? "api" : "app")
+                .putString("engine", engineGroup.getCheckedRadioButtonId() == 2001 ? "api"
+                        : engineGroup.getCheckedRadioButtonId() == 2002 ? "gemini" : "app")
+                .putString("geminiKey", geminiKey.getText().toString().trim())
+                .putString("geminiModel", geminiModel.getText().toString().trim())
                 .putString("aboutMe", aboutMe.getText().toString().trim())
                 .putString("language", language.getText().toString().trim())
                 .putBoolean("auto", autoSwitch.isChecked())

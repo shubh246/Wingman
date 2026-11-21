@@ -327,8 +327,9 @@ public class WingmanService extends AccessibilityService {
         final int pid = profileId;
         final String tail = chatTail();
         final String app = currentPkg;
-        final String apiKey = prefs.getString("apiKey", "");
-        final String model = prefs.getString("model", "claude-haiku-5-5");
+        final boolean gemini = prefs.getString("engine", "").equals("gemini");
+        final String apiKey = gemini ? prefs.getString("geminiKey", "") : prefs.getString("apiKey", "");
+        final String model = gemini ? prefs.getString("geminiModel", Gemini.DEFAULT_MODEL) : prefs.getString("model", "claude-haiku-5-5");
         final String about = prefs.getString("aboutMe", "");
         final String lang = prefs.getString("language", "");
         final String t = tone;
@@ -340,7 +341,10 @@ public class WingmanService extends AccessibilityService {
         new Thread(() -> {
             List<Claude.Suggestion> res = null;
             String err = null;
-            try { res = Claude.suggest(apiKey, model, about, lang, m, t, app, text); }
+            try {
+                res = gemini ? Gemini.suggest(apiKey, model, about, lang, m, t, app, text)
+                             : Claude.suggest(apiKey, model, about, lang, m, t, app, text);
+            }
             catch (Exception ex) { err = ex.getMessage() == null ? "Something went wrong." : ex.getMessage(); }
             final List<Claude.Suggestion> fr = res;
             final String fe = err;

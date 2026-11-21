@@ -31,7 +31,7 @@ public final class Claude {
         {"exit", "🙏 Wind down", "Kindly and clearly wind things down: honest, no ghosting, no drama."}
     };
 
-    private static final String SYSTEM =
+    static final String SYSTEM =
         "You are a dating-app wingman. You write messages the user can send.\n"
       + "Rules:\n"
       + "- Write as the user, in first person. Sound like a real person texting: casual, usually 1-2 short sentences, no essays, no cliches, no canned pickup lines.\n"
@@ -89,7 +89,11 @@ public final class Claude {
             JSONObject b = content.getJSONObject(i);
             if ("text".equals(b.optString("type"))) text.append(b.optString("text"));
         }
-        String t = text.toString();
+        return parseSuggestions(text.toString());
+    }
+
+    /** Pulls the JSON array of {text, why} out of a model's answer. */
+    static List<Suggestion> parseSuggestions(String t) throws Exception {
         int s = t.indexOf('['), e = t.lastIndexOf(']');
         if (s < 0 || e <= s) throw new Exception("Unexpected answer, tap Suggest again.");
         JSONArray arr = new JSONArray(t.substring(s, e + 1));
@@ -129,7 +133,7 @@ public final class Claude {
             + buildPrompt(aboutMe, language, mode, tone, app, screenText);
     }
 
-    private static String readAll(InputStream is) throws Exception {
+    static String readAll(InputStream is) throws Exception {
         if (is == null) return "";
         ByteArrayOutputStream bo = new ByteArrayOutputStream();
         byte[] buf = new byte[8192];

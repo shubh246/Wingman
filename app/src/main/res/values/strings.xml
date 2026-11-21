@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wingman</string>
+    <string name="a11y_desc">Wingman reads the profile or chat on screen in your dating apps (Tinder, Bumble, Hinge and others) so it can suggest openers and replies. Text is sent to Claude only to write suggestions. It never sends messages or taps anything for you.</string>
+</resources>

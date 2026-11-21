@@ -219,7 +219,7 @@ public class WingmanService extends AccessibilityService {
             if (panelShown) renderPanel();
             main.removeCallbacks(autoTask);
             String en = engine();
-            if ((en.equals("api") || en.equals("gemini")) && prefs.getBoolean("auto", true)) main.postDelayed(autoTask, 1800);
+            if ((en.equals("api") || en.equals("gemini") || en.equals("free")) && prefs.getBoolean("auto", true)) main.postDelayed(autoTask, 1800);
         }
     }
 
@@ -352,6 +352,7 @@ public class WingmanService extends AccessibilityService {
         final String tail = chatTail();
         final String app = currentPkg;
         final boolean gemini = prefs.getString("engine", "").equals("gemini");
+        final boolean free = prefs.getString("engine", "").equals("free");
         final String apiKey = gemini ? prefs.getString("geminiKey", "") : prefs.getString("apiKey", "");
         final String model = gemini ? prefs.getString("geminiModel", Gemini.DEFAULT_MODEL) : prefs.getString("model", "claude-haiku-5-5");
         final String about = prefs.getString("aboutMe", "");
@@ -366,7 +367,8 @@ public class WingmanService extends AccessibilityService {
             List<Claude.Suggestion> res = null;
             String err = null;
             try {
-                res = gemini ? Gemini.suggest(apiKey, model, about, lang, m, t, app, text)
+                res = free ? FreeAI.suggest(prefs, m, t, app, text)
+                    : gemini ? Gemini.suggest(apiKey, model, about, lang, m, t, app, text)
                              : Claude.suggest(apiKey, model, about, lang, m, t, app, text);
             }
             catch (Exception ex) { err = ex.getMessage() == null ? "Something went wrong." : ex.getMessage(); }

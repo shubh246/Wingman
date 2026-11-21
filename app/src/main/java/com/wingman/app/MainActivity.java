@@ -35,7 +35,8 @@ public class MainActivity extends Activity {
 
     private TextView status;
     private EditText apiKey, aboutMe, language, geminiKey, geminiModel;
-    private RadioGroup modelGroup, engineGroup;
+    private RadioGroup modelGroup, engineGroup, providerGroup;
+    private EditText freeKey, freeModel;
     private Switch autoSwitch, allAppsSwitch;
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
@@ -89,6 +90,11 @@ public class MainActivity extends Activity {
         rGem.setId(2002);
         rGem.setText("Gemini (free) · suggestions right in the bubble, automatically. Free key from Google, with daily limits.");
         rGem.setChecked(engine.equals("gemini"));
+        RadioButton rFree = new RadioButton(this);
+        rFree.setId(2004);
+        rFree.setText("Free AI provider (Groq, OpenRouter, Cerebras, Mistral) · suggestions right in the bubble, free key.");
+        rFree.setChecked(engine.equals("free"));
+        engineGroup.addView(rFree);
         RadioButton rNano = new RadioButton(this);
         rNano.setId(2003);
         rNano.setText("On-phone AI (Gemini Nano) · free, private, nothing leaves your phone. Only on supported phones; tap Test below.");
@@ -98,6 +104,31 @@ public class MainActivity extends Activity {
         engineGroup.addView(rApp);
         engineGroup.addView(rApi);
         col.addView(engineGroup);
+
+        col.addView(header("Free AI provider (only for that mode)"));
+        providerGroup = new RadioGroup(this);
+        String prov = p.getString("freeProvider", "groq");
+        for (int i = 0; i < FreeAI.PROVIDERS.length; i++) {
+            RadioButton r = new RadioButton(this);
+            r.setId(3000 + i);
+            r.setText(FreeAI.PROVIDERS[i][1]);
+            r.setChecked(FreeAI.PROVIDERS[i][0].equals(prov));
+            providerGroup.addView(r);
+        }
+        col.addView(providerGroup);
+        Button getFree = button("Get a free key for the chosen provider");
+        getFree.setOnClickListener(v -> {
+            int idx = providerGroup.getCheckedRadioButtonId() - 3000;
+            String[] pr = FreeAI.PROVIDERS[(idx >= 0 && idx < FreeAI.PROVIDERS.length) ? idx : 0];
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(pr[3])));
+        });
+        col.addView(getFree);
+        col.addView(text("Sign up free → create an API key → copy it here.", 13, 0xFF888888));
+        freeKey = edit("Paste your free key", p.getString("freeKey", ""), false);
+        freeKey.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        col.addView(freeKey);
+        freeModel = edit("Model: leave blank to pick automatically", p.getString("freeModel", ""), false);
+        col.addView(freeModel);
 
         Button testNano = button("Test on-phone AI on this phone");
         testNano.setOnClickListener(v -> startActivity(new Intent(this, NanoActivity.class).putExtra("test", true)));
@@ -185,6 +216,9 @@ public class MainActivity extends Activity {
     }
 
     private void save() {
+        String oldProv = getSharedPreferences(PREFS, MODE_PRIVATE).getString("freeProvider", "groq");
+        int pIdx = Math.max(0, Math.min(FreeAI.PROVIDERS.length - 1, providerGroup.getCheckedRadioButtonId() - 3000));
+        if (!FreeAI.PROVIDERS[pIdx][0].equals(oldProv)) freeModel.setText(""); // new provider: pick its model automatically
         int idx = modelGroup.getCheckedRadioButtonId() - 1000;
         String model = (idx >= 0 && idx < MODELS.length) ? MODELS[idx][0] : MODELS[0][0];
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
@@ -192,7 +226,12 @@ public class MainActivity extends Activity {
                 .putString("model", model)
                 .putString("engine", engineGroup.getCheckedRadioButtonId() == 2001 ? "api"
                         : engineGroup.getCheckedRadioButtonId() == 2002 ? "gemini"
-                        : engineGroup.getCheckedRadioButtonId() == 2003 ? "nano" : "app")
+                        : engineGroup.getCheckedRadioButtonId() == 2003 ? "nano"
+                        : engineGroup.getCheckedRadioButtonId() == 2004 ? "free" : "app")
+                .putString("freeProvider", FreeAI.PROVIDERS[Math.max(0, Math.min(FreeAI.PROVIDERS.length - 1,
+                        providerGroup.getCheckedRadioButtonId() - 3000))][0])
+                .putString("freeKey", freeKey.getText().toString().trim())
+                .putString("freeModel", freeModel.getText().toString().trim())
                 .putString("geminiKey", geminiKey.getText().toString().trim())
                 .putString("geminiModel", geminiModel.getText().toString().trim())
                 .putString("aboutMe", aboutMe.getText().toString().trim())
